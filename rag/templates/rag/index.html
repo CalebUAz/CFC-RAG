@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p class="mb-2">
                                 <a href="${source.youtube_link}" target="_blank" class="btn btn-sm btn-outline-danger">
                                     <i class="fab fa-youtube me-1"></i>Watch Video
-                                    ${source.timestamp !== "0" ? ` (at ${source.timestamp}s)` : ''}
+                                    ${source.timestamp !== "0" ? ` (at ${source.timestamp_display})` : ''}
                                 </a>
                             </p>
                         ` : source.video_id ? `

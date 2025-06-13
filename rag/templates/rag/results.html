@@ -30,7 +30,7 @@
                     <a href="{{ source.youtube_link }}" target="_blank" class="btn btn-sm btn-outline-danger">
                         <i class="fab fa-youtube me-1"></i>Watch Video
                         {% if source.timestamp != "0" %}
-                            (at {{ source.timestamp }}s)
+                            (at {{ source.timestamp_display }})
                         {% endif %}
                     </a>
                 </p>

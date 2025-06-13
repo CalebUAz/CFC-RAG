@@ -293,6 +293,33 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             cleaned = cleaned[:max_length].rsplit(' ', 1)[0] + "..."
 
         return cleaned
+
+    def _format_timestamp_display(self, timestamp_seconds: str) -> str:
+        """
+        Format timestamp in seconds to human-readable format.
+
+        Args:
+            timestamp_seconds (str): Timestamp in seconds
+
+        Returns:
+            str: Formatted timestamp (e.g., "16:40", "1:23:45")
+        """
+        try:
+            total_seconds = int(timestamp_seconds)
+        except (ValueError, TypeError):
+            return "0:00"
+
+        if total_seconds == 0:
+            return "0:00"
+
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+
+        if hours > 0:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{minutes}:{seconds:02d}"
     
     def query(self, question: str) -> Dict[str, Any]:
         """
@@ -326,6 +353,7 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
                     'author': doc.metadata.get('author', 'Unknown Author'),
                     'video_id': video_id,
                     'timestamp': timestamp,
+                    'timestamp_display': self._format_timestamp_display(timestamp),
                     'youtube_link': youtube_link,
                     'content_preview': self._clean_content_preview(doc.page_content)
                 }
