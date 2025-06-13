@@ -189,9 +189,110 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         formatted_context = []
         for i, doc in enumerate(docs, 1):
             title = doc.metadata.get('title', 'Unknown Title')
-            content = doc.page_content[:500] + "..." if len(doc.page_content) > 500 else doc.page_content
+            # Clean the content and limit to 500 characters for context
+            content = self._clean_content_preview(doc.page_content, max_length=500)
             formatted_context.append(f"Sermon {i}: {title}\n{content}\n")
         return "\n".join(formatted_context)
+
+    def _extract_timestamp(self, content: str) -> str:
+        """
+        Extract timestamp from content.
+
+        Looks for patterns like:
+        - "10s" or "1s" (seconds)
+        - "1:30" or "10:45" (minutes:seconds)
+        - "1h 30m" or "2h 15m 30s" (hours, minutes, seconds)
+
+        Args:
+            content (str): The content to search for timestamps
+
+        Returns:
+            str: Timestamp in seconds for YouTube URL
+        """
+        # Look for various timestamp patterns in the first 100 characters
+        search_text = content[:100].lower()
+
+        # Pattern 1: Simple seconds like "10s", "45s"
+        seconds_match = re.search(r'(\d+)s(?!\w)', search_text)
+        if seconds_match:
+            return seconds_match.group(1)
+
+        # Pattern 2: Minutes:seconds like "1:30", "10:45"
+        time_match = re.search(r'(\d+):(\d+)', search_text)
+        if time_match:
+            minutes = int(time_match.group(1))
+            seconds = int(time_match.group(2))
+            total_seconds = minutes * 60 + seconds
+            return str(total_seconds)
+
+        # Pattern 3: Hours, minutes, seconds like "1h 30m 45s"
+        hms_match = re.search(r'(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?', search_text)
+        if hms_match and any(hms_match.groups()):
+            hours = int(hms_match.group(1) or 0)
+            minutes = int(hms_match.group(2) or 0)
+            seconds = int(hms_match.group(3) or 0)
+            total_seconds = hours * 3600 + minutes * 60 + seconds
+            if total_seconds > 0:
+                return str(total_seconds)
+
+        # Pattern 4: Look for time-like numbers at the beginning
+        start_time_match = re.search(r'^(\d{1,2}):(\d{2})', search_text)
+        if start_time_match:
+            minutes = int(start_time_match.group(1))
+            seconds = int(start_time_match.group(2))
+            total_seconds = minutes * 60 + seconds
+            return str(total_seconds)
+
+        # Default to 0 if no timestamp found
+        return "0"
+
+    def _create_youtube_link(self, video_id: str, timestamp: str = "0") -> str:
+        """
+        Create a YouTube link with timestamp.
+
+        Args:
+            video_id (str): YouTube video ID
+            timestamp (str): Timestamp in seconds
+
+        Returns:
+            str: Complete YouTube URL with timestamp
+        """
+        if not video_id:
+            return ""
+
+        # Ensure timestamp is valid
+        try:
+            int(timestamp)
+        except (ValueError, TypeError):
+            timestamp = "0"
+
+        return f"https://www.youtube.com/watch?v={video_id}&t={timestamp}s"
+
+    def _clean_content_preview(self, content: str, max_length: int = 200) -> str:
+        """
+        Clean content preview by removing timestamp markers and formatting.
+
+        Args:
+            content (str): Raw content from the document
+            max_length (int): Maximum length of the preview
+
+        Returns:
+            str: Cleaned content preview
+        """
+        # Remove timestamp markers like "598s", "601s", etc.
+        cleaned = re.sub(r'\b\d+s\b', '', content)
+
+        # Remove extra whitespace that might be left after removing timestamps
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+
+        # Remove leading/trailing whitespace
+        cleaned = cleaned.strip()
+
+        # Truncate to max length and add ellipsis if needed
+        if len(cleaned) > max_length:
+            cleaned = cleaned[:max_length].rsplit(' ', 1)[0] + "..."
+
+        return cleaned
     
     def query(self, question: str) -> Dict[str, Any]:
         """
@@ -213,15 +314,22 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             # Generate answer
             answer = self.rag_chain.invoke(question)
             
-            # Format sources
+            # Format sources with YouTube links
             sources = []
             for doc in relevant_docs:
-                sources.append({
+                video_id = doc.metadata.get('video_id', '')
+                timestamp = self._extract_timestamp(doc.page_content)
+                youtube_link = self._create_youtube_link(video_id, timestamp)
+
+                source_info = {
                     'title': doc.metadata.get('title', 'Unknown Title'),
                     'author': doc.metadata.get('author', 'Unknown Author'),
-                    'video_id': doc.metadata.get('video_id', ''),
-                    'content_preview': doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
-                })
+                    'video_id': video_id,
+                    'timestamp': timestamp,
+                    'youtube_link': youtube_link,
+                    'content_preview': self._clean_content_preview(doc.page_content)
+                }
+                sources.append(source_info)
             
             return {
                 'question': question,
@@ -259,3 +367,65 @@ def get_rag_service() -> SermonRAGService:
     if _rag_service is None:
         _rag_service = SermonRAGService()
     return _rag_service
+
+
+def query_sermons(question: str, show_sources: bool = True):
+    """
+    Query the RAG system with a question about the sermons.
+    Enhanced version with YouTube links and timestamps.
+
+    Args:
+        question (str): The question to ask
+        show_sources (bool): Whether to show the source documents
+
+    Returns:
+        str: The generated answer
+    """
+    print(f"❓ Question: {question}")
+    print("🔍 Searching for relevant content...")
+
+    # Get RAG service
+    rag_service = get_rag_service()
+
+    if not rag_service.is_ready():
+        print("❌ RAG system is not ready. Please check your configuration.")
+        return "RAG system is not ready. Please check your configuration."
+
+    try:
+        # Get relevant documents
+        relevant_docs = rag_service.retriever.get_relevant_documents(question)
+
+        if show_sources:
+            print("\n📚 Sources found:")
+            for i, doc in enumerate(relevant_docs, 1):
+                title = doc.metadata.get('title', 'Unknown Title')
+                video_id = doc.metadata.get('video_id', '')
+
+                # Extract timestamp using the service method
+                timestamp = rag_service._extract_timestamp(doc.page_content)
+
+                # Create YouTube link with timestamp
+                youtube_link = rag_service._create_youtube_link(video_id, timestamp)
+
+                if youtube_link:
+                    print(f"{i}. {title} - [Watch Video]({youtube_link})")
+                else:
+                    print(f"{i}. {title} - (No video link available)")
+
+        # Generate answer using the service
+        result = rag_service.query(question)
+        answer = result['answer']
+
+        print("\n🤖 Generating answer...")
+        print("\n💬 Answer:")
+        print(answer)
+
+        return answer
+
+    except Exception as e:
+        error_msg = f"Error processing query: {str(e)}"
+        print(f"❌ {error_msg}")
+        return error_msg
+
+
+print("✅ Query function ready!")

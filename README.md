@@ -8,6 +8,7 @@ A Django web application that uses Retrieval-Augmented Generation (RAG) to answe
 - 🤖 **AI-Powered Answers**: Get contextual answers using Google Gemini
 - 🌐 **Web Interface**: Clean, responsive web interface for easy querying
 - 📚 **Source Attribution**: See which sermons the answers come from
+- 🎥 **YouTube Integration**: Direct links to YouTube videos with timestamps
 - 🐳 **Docker Support**: Fully containerized for easy deployment
 - ⚡ **Fast Retrieval**: FAISS vector database for efficient similarity search
 
@@ -99,6 +100,22 @@ curl -X POST http://localhost:8000/api/query/ \
   -H "Content-Type: application/json" \
   -d '{"question": "What does the Bible teach about contentment?"}'
 ```
+
+### Enhanced Query Function
+
+The system now includes an enhanced query function with YouTube video links and timestamps:
+
+```python
+from rag.services import query_sermons
+
+# Query with YouTube links and timestamps
+answer = query_sermons("What does the Bible teach about contentment?", show_sources=True)
+```
+
+This will output:
+- The answer to your question
+- Source sermons with clickable YouTube links
+- Automatic timestamp extraction and linking
 
 ## Project Structure
 
