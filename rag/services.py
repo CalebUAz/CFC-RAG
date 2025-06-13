@@ -320,6 +320,27 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             return f"{hours}:{minutes:02d}:{seconds:02d}"
         else:
             return f"{minutes}:{seconds:02d}"
+
+    def _format_llm_response(self, response: str) -> str:
+        """
+        Format LLM response by converting markdown formatting to HTML.
+
+        Args:
+            response (str): Raw LLM response with markdown formatting
+
+        Returns:
+            str: Formatted response with HTML tags
+        """
+        # Convert **text** to <b>text</b> for bold formatting
+        formatted = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response)
+
+        # Convert *text* to <i>text</i> for italic formatting
+        formatted = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted)
+
+        # Convert line breaks to HTML line breaks for better web display
+        formatted = formatted.replace('\n', '<br>')
+
+        return formatted
     
     def query(self, question: str) -> Dict[str, Any]:
         """
@@ -339,8 +360,11 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             relevant_docs = self.retriever.get_relevant_documents(question)
             
             # Generate answer
-            answer = self.rag_chain.invoke(question)
-            
+            raw_answer = self.rag_chain.invoke(question)
+
+            # Format the answer for better display
+            answer = self._format_llm_response(raw_answer)
+
             # Format sources with YouTube links
             sources = []
             for doc in relevant_docs:

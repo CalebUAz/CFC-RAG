@@ -113,6 +113,30 @@ def test_timestamp_formatting():
     print()
 
 
+def test_llm_response_formatting():
+    """Test LLM response formatting."""
+    print("🎨 Testing LLM response formatting...")
+
+    rag_service = get_rag_service()
+
+    test_cases = [
+        ("* **Denying your own will:** This is important", "* <b>Denying your own will:</b> This is important"),
+        ("**Bold text** and *italic text*", "<b>Bold text</b> and <i>italic text</i>"),
+        ("Line 1\nLine 2\nLine 3", "Line 1<br>Line 2<br>Line 3"),
+        ("**Multiple** **bold** words", "<b>Multiple</b> <b>bold</b> words"),
+        ("No formatting here", "No formatting here"),
+    ]
+
+    for input_text, expected in test_cases:
+        result = rag_service._format_llm_response(input_text)
+        status = "✅" if result == expected else "❌"
+        print(f"{status} '{input_text}' -> '{result}'")
+        if result != expected:
+            print(f"    Expected: '{expected}'")
+
+    print()
+
+
 def test_enhanced_query():
     """Test the enhanced query function."""
     print("🔍 Testing enhanced query function...")
@@ -151,6 +175,7 @@ def main():
     test_youtube_link_creation()
     test_content_cleaning()
     test_timestamp_formatting()
+    test_llm_response_formatting()
 
     # Test the full query system
     test_enhanced_query()
