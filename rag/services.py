@@ -6,6 +6,7 @@ for querying sermon content using FAISS vectorstore and Google Gemini.
 """
 
 import os
+import re
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -101,6 +102,9 @@ class SermonRAGService:
             df['sermon'] = df['sermon'].apply(
                 lambda x: x[6:] if x.lower().startswith('music ') else x
             )
+            df['sermon'] = df['sermon'].apply(
+                lambda x: re.sub(r'\d+s\s+music\s+', '', x, 
+                                 flags=re.IGNORECASE))
             if 'Unnamed: 0' in df.columns:
                 df.drop(columns=['Unnamed: 0'], inplace=True)
             df.reset_index(drop=True, inplace=True)

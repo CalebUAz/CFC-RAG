@@ -194,4 +194,6 @@ cython_debug/
 .cursorindexingignore
 
 /CFC_venv/
-/vectorstore/
+/vectorstore/*
+
+vectorstore/sermons_vectorstore/index.pkl
