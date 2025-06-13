@@ -1,0 +1,99 @@
+{% extends 'rag/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        {% if error %}
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="question-box">
+            <h3><i class="fas fa-question-circle me-2"></i>Ask a Question</h3>
+            <p class="text-muted mb-3">
+                Ask any question about Zac Poonen's sermons. The AI will search through 
+                417 sermons and provide you with relevant answers based on the content.
+            </p>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="question" class="form-label">Your Question</label>
+                    <textarea 
+                        class="form-control" 
+                        id="question" 
+                        name="question" 
+                        rows="3" 
+                        placeholder="e.g., What does the Bible teach about contentment?"
+                        required
+                    >{{ request.POST.question|default:"" }}</textarea>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-search me-2"></i>Search Sermons
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Example questions -->
+        <div class="mt-4">
+            <h5><i class="fas fa-lightbulb me-2"></i>Example Questions</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="?q=What+does+the+Bible+teach+about+contentment?" class="text-decoration-none">
+                                What does the Bible teach about contentment?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="?q=How+can+I+overcome+temptation?" class="text-decoration-none">
+                                How can I overcome temptation?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="?q=What+is+true+discipleship?" class="text-decoration-none">
+                                What is true discipleship?
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="?q=How+should+Christians+handle+money?" class="text-decoration-none">
+                                How should Christians handle money?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="?q=What+does+it+mean+to+fear+God?" class="text-decoration-none">
+                                What does it mean to fear God?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="?q=How+can+I+grow+spiritually?" class="text-decoration-none">
+                                How can I grow spiritually?
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Pre-fill question from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const question = urlParams.get('q');
+    if (question) {
+        document.getElementById('question').value = decodeURIComponent(question);
+    }
+});
+</script>
+{% endblock %}

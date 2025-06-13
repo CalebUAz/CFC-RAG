@@ -1,0 +1,194 @@
+{% extends 'rag/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="question-box">
+            <h3><i class="fas fa-question-circle me-2"></i>Ask a Question</h3>
+            <p class="text-muted mb-3">
+                Ask any question about Zac Poonen's sermons. The AI will search through 
+                417 sermons and provide you with relevant answers based on the content.
+            </p>
+            
+            <form id="queryForm">
+                <div class="mb-3">
+                    <label for="question" class="form-label">Your Question</label>
+                    <textarea 
+                        class="form-control" 
+                        id="question" 
+                        name="question" 
+                        rows="3" 
+                        placeholder="e.g., What does the Bible teach about contentment?"
+                        required
+                    ></textarea>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <span class="submit-text">
+                            <i class="fas fa-search me-2"></i>Search Sermons
+                        </span>
+                        <span class="loading">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Searching...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Results will be displayed here -->
+        <div id="results" style="display: none;"></div>
+        
+        <!-- Example questions -->
+        <div class="mt-4">
+            <h5><i class="fas fa-lightbulb me-2"></i>Example Questions</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                What does the Bible teach about contentment?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                How can I overcome temptation?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                What is true discipleship?
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                How should Christians handle money?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                What does it mean to fear God?
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="#" class="example-question text-decoration-none">
+                                How can I grow spiritually?
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('queryForm');
+    const questionInput = document.getElementById('question');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitText = submitBtn.querySelector('.submit-text');
+    const loadingText = submitBtn.querySelector('.loading');
+    const resultsDiv = document.getElementById('results');
+    
+    // Handle form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const question = questionInput.value.trim();
+        if (!question) {
+            alert('Please enter a question.');
+            return;
+        }
+        
+        // Show loading state
+        submitText.style.display = 'none';
+        loadingText.style.display = 'inline';
+        submitBtn.disabled = true;
+        resultsDiv.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/query/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                displayResults(data);
+            } else {
+                displayError(data.error || 'An error occurred');
+            }
+        } catch (error) {
+            displayError('Network error: ' + error.message);
+        } finally {
+            // Reset button state
+            submitText.style.display = 'inline';
+            loadingText.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+    });
+    
+    // Handle example questions
+    document.querySelectorAll('.example-question').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            questionInput.value = this.textContent;
+            questionInput.focus();
+        });
+    });
+    
+    function displayResults(data) {
+        const html = `
+            <div class="answer-box">
+                <h4><i class="fas fa-comment-dots me-2"></i>Answer</h4>
+                <div class="answer-content">
+                    ${data.answer.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+            
+            ${data.sources && data.sources.length > 0 ? `
+            <div class="sources-box">
+                <h5><i class="fas fa-book me-2"></i>Sources (${data.num_sources} sermons found)</h5>
+                ${data.sources.map((source, index) => `
+                    <div class="source-item">
+                        <h6 class="mb-2">${index + 1}. ${source.title}</h6>
+                        <p class="text-muted mb-1">by ${source.author}</p>
+                        <p class="mb-0">${source.content_preview}</p>
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
+        `;
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function displayError(error) {
+        const html = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error:</strong> ${error}
+            </div>
+        `;
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+});
+</script>
+{% endblock %}

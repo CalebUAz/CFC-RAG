@@ -1,0 +1,48 @@
+{% extends 'rag/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <!-- Question -->
+        <div class="question-box">
+            <h4><i class="fas fa-question-circle me-2"></i>Question</h4>
+            <p class="mb-0">{{ result.question }}</p>
+        </div>
+        
+        <!-- Answer -->
+        <div class="answer-box">
+            <h4><i class="fas fa-comment-dots me-2"></i>Answer</h4>
+            <div class="answer-content">
+                {{ result.answer|linebreaks }}
+            </div>
+        </div>
+        
+        <!-- Sources -->
+        {% if result.sources %}
+        <div class="sources-box">
+            <h5><i class="fas fa-book me-2"></i>Sources ({{ result.num_sources }} sermon{{ result.num_sources|pluralize }} found)</h5>
+            {% for source in result.sources %}
+            <div class="source-item">
+                <h6 class="mb-2">{{ forloop.counter }}. {{ source.title }}</h6>
+                <p class="text-muted mb-1">by {{ source.author }}</p>
+                {% if source.video_id %}
+                <p class="text-muted mb-1">Video ID: {{ source.video_id }}</p>
+                {% endif %}
+                <p class="mb-0">{{ source.content_preview }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Ask another question -->
+        <div class="text-center mt-4">
+            <a href="{% url 'rag:query' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Ask Another Question
+            </a>
+            <a href="{% url 'rag:index' %}" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-home me-2"></i>Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
