@@ -196,5 +196,5 @@ cython_debug/
 /CFC_venv/
 /vectorstore/*
 
-vectorstore/sermons_vectorstore/index.pkl
 .DS_Store
+vectorstore/sermons_vectorstore/index.pkl
