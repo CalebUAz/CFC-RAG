@@ -144,7 +144,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # RAG Configuration
 VECTORSTORE_PATH = BASE_DIR / "vectorstore" / "sermons_vectorstore"
-DATASET_PATH = BASE_DIR / "dataset" / "sermons_zac_timestamp.csv"
+DATASET_PATH = BASE_DIR / "dataset" / "RLCF-Pitts.csv"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

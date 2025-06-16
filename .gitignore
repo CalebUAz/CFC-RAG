@@ -197,3 +197,4 @@ cython_debug/
 /vectorstore/*
 
 vectorstore/sermons_vectorstore/index.pkl
+.DS_Store
