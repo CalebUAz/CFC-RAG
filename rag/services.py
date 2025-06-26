@@ -443,13 +443,27 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         return status
 
 
-# Global instance
-_rag_service = None
+# Global instance - Initialize immediately at startup
+print("🚀 Initializing RAG service at startup...")
+try:
+    _rag_service = SermonRAGService()
+    if _rag_service.is_ready():
+        print("✅ RAG service initialized successfully!")
+        # Get document count for status
+        status = _rag_service.get_vectorstore_status()
+        if 'document_count' in status and status['document_count'] != 'unknown':
+            print(f"📚 Vectorstore loaded with {status['document_count']} documents")
+    else:
+        print("⚠️ RAG service initialized but not fully ready")
+except Exception as e:
+    print(f"❌ Failed to initialize RAG service at startup: {e}")
+    _rag_service = None
 
 def get_rag_service() -> SermonRAGService:
-    """Get or create the global RAG service instance."""
+    """Get the global RAG service instance."""
     global _rag_service
     if _rag_service is None:
+        print("🔄 Creating RAG service instance...")
         _rag_service = SermonRAGService()
     return _rag_service
 
@@ -526,4 +540,25 @@ def query_sermons(question: str, show_sources: bool = True):
         return error_msg
 
 
-print("✅ Query function ready!")
+def initialize_rag_service():
+    """Explicitly initialize the RAG service. Useful for startup scripts."""
+    global _rag_service
+    if _rag_service is None or not _rag_service.is_ready():
+        print("🔄 Initializing RAG service...")
+        _rag_service = SermonRAGService()
+        if _rag_service.is_ready():
+            print("✅ RAG service ready!")
+            return True
+        else:
+            print("❌ RAG service failed to initialize properly")
+            return False
+    else:
+        print("✅ RAG service already initialized and ready")
+        return True
+
+
+# Final startup message
+if _rag_service and _rag_service.is_ready():
+    print("🎉 RAG services module loaded successfully!")
+else:
+    print("⚠️ RAG services module loaded but service may need initialization")
