@@ -138,13 +138,13 @@ class SermonRAGService:
             # Create vectorstore
             print("⏳ Creating vector store... (this may take a few minutes)")
             self.vectorstore = FAISS.from_documents(
-                documents=split_docs[0:100],
+                documents=split_docs[0:500],
                 embedding=self.embeddings
             )
             
             # Add remaining documents in batches
-            for i in range(100, len(split_docs), 100):
-                self.vectorstore.add_documents(split_docs[i:i+100])
+            for i in range(500, len(split_docs), 100):
+                self.vectorstore.add_documents(split_docs[i:i+500])
                 if i % 1000 == 0:
                     print(f"Processed {i}/{len(split_docs)} documents")
             
@@ -365,15 +365,28 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             # Format the answer for better display
             answer = self._format_llm_response(raw_answer)
 
-            # Format sources with YouTube links
+            # Format sources with YouTube links and deduplicate
             sources = []
+            seen_sources = set()  # Track unique source combinations
+            
             for doc in relevant_docs:
                 video_id = doc.metadata.get('video_id', '')
+                title = doc.metadata.get('title', 'Unknown Title')
+                
+                # Create unique identifier for deduplication
+                source_key = f"{video_id}_{title}"
+                
+                # Skip if we've already seen this source
+                if source_key in seen_sources:
+                    continue
+                
+                seen_sources.add(source_key)
+                
                 timestamp = self._extract_timestamp(doc.page_content)
                 youtube_link = self._create_youtube_link(video_id, timestamp)
 
                 source_info = {
-                    'title': doc.metadata.get('title', 'Unknown Title'),
+                    'title': title,
                     'author': doc.metadata.get('author', 'Unknown Author'),
                     'video_id': video_id,
                     'timestamp': timestamp,
@@ -408,6 +421,26 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             self.retriever is not None,
             self.rag_chain is not None
         ])
+
+    def get_vectorstore_status(self) -> Dict[str, Any]:
+        """Get detailed status of the vectorstore."""
+        vectorstore_path = settings.VECTORSTORE_PATH
+
+        status = {
+            'exists': vectorstore_path.exists(),
+            'path': str(vectorstore_path),
+            'loaded': self.vectorstore is not None,
+            'ready': self.is_ready()
+        }
+
+        if self.vectorstore:
+            try:
+                # Get approximate document count
+                status['document_count'] = self.vectorstore.index.ntotal
+            except:
+                status['document_count'] = 'unknown'
+
+        return status
 
 
 # Global instance
@@ -449,9 +482,22 @@ def query_sermons(question: str, show_sources: bool = True):
 
         if show_sources:
             print("\n📚 Sources found:")
-            for i, doc in enumerate(relevant_docs, 1):
+            seen_sources = set()  # Track unique source combinations
+            source_count = 0
+            
+            for doc in relevant_docs:
                 title = doc.metadata.get('title', 'Unknown Title')
                 video_id = doc.metadata.get('video_id', '')
+                
+                # Create unique identifier for deduplication
+                source_key = f"{video_id}_{title}"
+                
+                # Skip if we've already seen this source
+                if source_key in seen_sources:
+                    continue
+                
+                seen_sources.add(source_key)
+                source_count += 1
 
                 # Extract timestamp using the service method
                 timestamp = rag_service._extract_timestamp(doc.page_content)
@@ -460,9 +506,9 @@ def query_sermons(question: str, show_sources: bool = True):
                 youtube_link = rag_service._create_youtube_link(video_id, timestamp)
 
                 if youtube_link:
-                    print(f"{i}. {title} - [Watch Video]({youtube_link})")
+                    print(f"{source_count}. {title} - [Watch Video]({youtube_link})")
                 else:
-                    print(f"{i}. {title} - (No video link available)")
+                    print(f"{source_count}. {title} - (No video link available)")
 
         # Generate answer using the service
         result = rag_service.query(question)

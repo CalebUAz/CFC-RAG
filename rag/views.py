@@ -71,6 +71,33 @@ def health_check(request):
         }, status=500)
 
 
+def status(request):
+    """Detailed status endpoint for RAG system."""
+    try:
+        rag_service = get_rag_service()
+        status_info = rag_service.get_vectorstore_status()
+
+        # Add component status
+        status_info.update({
+            'components': {
+                'embeddings': rag_service.embeddings is not None,
+                'llm': rag_service.llm is not None,
+                'vectorstore': rag_service.vectorstore is not None,
+                'retriever': rag_service.retriever is not None,
+                'rag_chain': rag_service.rag_chain is not None,
+            },
+            'overall_status': 'ready' if rag_service.is_ready() else 'not_ready'
+        })
+
+        return JsonResponse(status_info)
+
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'overall_status': 'error'
+        }, status=500)
+
+
 class QueryView(View):
     """Class-based view for handling queries."""
 

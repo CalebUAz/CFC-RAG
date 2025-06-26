@@ -194,7 +194,9 @@ cython_debug/
 .cursorindexingignore
 
 /CFC_venv/
-/vectorstore/*
+
+# Vectorstore files (keep directory structure but ignore the actual vectorstore files)
+/vectorstore/sermons_vectorstore/*
+!/vectorstore/sermons_vectorstore/.gitkeep
 
 .DS_Store
-vectorstore/sermons_vectorstore/index.pkl
