@@ -17,9 +17,9 @@ langchain-text-splitters==0.3.8
 tqdm
 
 # Production dependencies
-django-secure==1.0.2
-sentry-sdk[django]==1.40.0
-redis==5.0.1
-celery==5.3.4
-django-celery-beat==2.5.0
-django-celery-results==2.5.1
+# django-secure==1.0.2
+sentry-sdk[django]==2.32.0
+redis==6.2.0
+celery==5.5.3
+django-celery-beat==2.8.1
+django-celery-results==2.6.0
