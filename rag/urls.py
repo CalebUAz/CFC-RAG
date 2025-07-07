@@ -12,5 +12,6 @@ urlpatterns = [
     path('query/', views.QueryView.as_view(), name='query'),
     path('api/query/', views.query_sermons, name='api_query'),
     path('health/', views.health_check, name='health'),
+    path('health/detailed/', views.health_check_detailed, name='health_detailed'),
     path('status/', views.status, name='status'),
 ]

@@ -31,11 +31,16 @@ class SermonRAGService:
         self.llm = None
         self.retriever = None
         self.rag_chain = None
-        self._initialize_components()
+        self._initialized = False
     
     def _initialize_components(self):
         """Initialize all RAG components."""
+        if self._initialized:
+            return
+            
         try:
+            print("🚀 Initializing RAG components...")
+            
             # Initialize embeddings
             self.embeddings = GoogleGenerativeAIEmbeddings(
                 model="models/embedding-001",
@@ -55,16 +60,19 @@ class SermonRAGService:
             # Create retriever
             if self.vectorstore:
                 self.retriever = self.vectorstore.as_retriever(
-                    search_type="mmr",
+                    search_type="mmr",  # Use MMR (Maximal Marginal Relevance) for diversity
                     search_kwargs={
-                        "k": 10,
-                        "fetch_k": 20,
-                        "lambda_mult": 0.7
+                        "k": 10,  # Get more documents initially
+                        "fetch_k": 20,  # Fetch more candidates
+                        "lambda_mult": 0.7  # Balance between relevance and diversity
                     }
                 )
                 
                 # Create RAG chain
                 self._create_rag_chain()
+                
+            self._initialized = True
+            print("✅ RAG components initialized successfully!")
                 
         except Exception as e:
             print(f"Error initializing RAG components: {e}")
@@ -356,6 +364,10 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         Returns:
             Dict containing the answer and source information
         """
+        # Initialize components if not already done
+        if not self._initialized:
+            self._initialize_components()
+        
         if not self.rag_chain:
             raise RuntimeError("RAG system not properly initialized")
         
@@ -425,6 +437,13 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
     
     def is_ready(self) -> bool:
         """Check if the RAG system is ready to handle queries."""
+        if not self._initialized:
+            try:
+                self._initialize_components()
+            except Exception as e:
+                print(f"Error during initialization: {e}")
+                return False
+        
         return all([
             self.embeddings is not None,
             self.vectorstore is not None,
@@ -454,21 +473,8 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         return status
 
 
-# Global instance - Initialize immediately at startup
-print("🚀 Initializing RAG service at startup...")
-try:
-    _rag_service = SermonRAGService()
-    if _rag_service.is_ready():
-        print("✅ RAG service initialized successfully!")
-        # Get document count for status
-        status = _rag_service.get_vectorstore_status()
-        if 'document_count' in status and status['document_count'] != 'unknown':
-            print(f"📚 Vectorstore loaded with {status['document_count']} documents")
-    else:
-        print("⚠️ RAG service initialized but not fully ready")
-except Exception as e:
-    print(f"❌ Failed to initialize RAG service at startup: {e}")
-    _rag_service = None
+# Global instance - Initialize lazily
+_rag_service = None
 
 def get_rag_service() -> SermonRAGService:
     """Get the global RAG service instance."""
@@ -570,7 +576,4 @@ def initialize_rag_service():
 
 
 # Final startup message
-if _rag_service and _rag_service.is_ready():
-    print("🎉 RAG services module loaded successfully!")
-else:
-    print("⚠️ RAG services module loaded but service may need initialization")
+print("🎉 RAG services module loaded successfully!")

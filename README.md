@@ -1,326 +1,245 @@
-# Sermon RAG - Django-based Question Answering System
+# Sermon RAG - AI-Powered Sermon Question Answering
 
-A Django web application that uses Retrieval-Augmented Generation (RAG) to answer questions about Zac Poonen's sermons. The system uses Google Gemini for embeddings and text generation, with FAISS for vector search.
+A Retrieval-Augmented Generation (RAG) system that answers questions about sermons using AI. Built with Django, LangChain, FAISS, and Google Gemini.
 
-## Features
-
-- 🔍 **Semantic Search**: Search through 417 sermons using vector embeddings
-- 🤖 **AI-Powered Answers**: Get contextual answers using Google Gemini
-- 🌐 **Web Interface**: Clean, responsive web interface for easy querying
-- 📚 **Source Attribution**: See which sermons the answers come from
-- 🎥 **YouTube Integration**: Direct links to YouTube videos with timestamps
-- 🐳 **Docker Support**: Fully containerized for easy deployment
-- ⚡ **Fast Retrieval**: FAISS vector database for efficient similarity search
-- 🚀 **Production Ready**: Optimized for Fly.io deployment with auto-scaling
-
-## Quick Start
-
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd CFC-RAG
-   ```
-
-2. **Set up environment**
-   ```bash
-   # Copy environment template
-   cp env.example .env
-
-   # Edit .env file with your Google API key
-   # Get your API key from: https://makersuite.google.com/app/apikey
-   nano .env
-   ```
-
-3. **Run the startup script**
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-
-   This script will:
-   - Create a virtual environment
-   - Install dependencies
-   - Run migrations
-   - Initialize the vectorstore (if needed)
-   - Start the development server
-
-4. **Access the application**
-   - Open your browser to `http://localhost:8000`
-   - Start asking questions about the sermons!
-
-### Docker Deployment
-
-1. **Build and run with Docker Compose**
-   ```bash
-   # Copy environment file
-   cp env.example .env
-   # Edit .env with your settings
-
-   # Build and start
-   docker-compose up --build
-   ```
-
-2. **Access the application**
-   - Open your browser to `http://localhost:8000`
-
-## 🚀 Fly.io Production Deployment
+## 🚀 Quick Deploy to Production
 
 ### Prerequisites
+- [Fly.io CLI](https://fly.io/docs/hands-on/install-flyctl/)
+- [Docker](https://docs.docker.com/get-docker/)
+- Google API Key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-1. **Install Fly CLI**
-   ```bash
-   # macOS
-   brew install flyctl
-   
-   # Linux
-   curl -L https://fly.io/install.sh | sh
-   
-   # Windows
-   powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
-   ```
-
-2. **Authenticate with Fly.io**
-   ```bash
-   fly auth login
-   ```
-
-### Automated Deployment
-
-Use the provided deployment script for easy deployment:
+### One-Command Deployment
 
 ```bash
-# Make the script executable
-chmod +x scripts/deploy.sh
+# Clone the repository
+git clone <your-repo-url>
+cd CFC-RAG
 
-# Deploy with default settings
-./scripts/deploy.sh
-
-# Deploy with custom settings
-./scripts/deploy.sh -a my-sermon-app -r syd -s 20
+# Run the deployment script
+./deploy.sh
 ```
 
-### Manual Deployment
+The deployment script will:
+- ✅ Check prerequisites
+- ✅ Set up environment variables
+- ✅ Create Fly.io app and volume
+- ✅ Deploy the application
+- ✅ Initialize the vectorstore
+- ✅ Verify deployment
 
-1. **Create the Fly app**
-   ```bash
-   fly apps create sermon-rag
-   ```
+## 🏗️ Local Development
 
-2. **Create persistent volume**
-   ```bash
-   fly volumes create sermon_data --size 10 --region iad
-   ```
-
-3. **Set environment variables**
-   ```bash
-   fly secrets set GOOGLE_API_KEY="your-google-api-key"
-   fly secrets set SECRET_KEY="$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
-   fly secrets set DEBUG="False"
-   fly secrets set ALLOWED_HOSTS="sermon-rag.fly.dev,*.fly.dev,*.fly.io"
-   ```
-
-4. **Deploy the application**
-   ```bash
-   fly deploy
-   ```
-
-### Health Checks
-
-After deployment, verify your application is running correctly:
+### Setup
 
 ```bash
-# Run health checks
-python scripts/health_check.py https://your-app.fly.dev
+# Clone the repository
+git clone <your-repo-url>
+cd CFC-RAG
 
-# Check logs
-fly logs
+# Create virtual environment
+python3 -m venv CFC_venv
+source CFC_venv/bin/activate  # On Windows: CFC_venv\Scripts\activate
 
-# Check status
-fly status
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment variables
+cp env.example .env
+# Edit .env with your Google API key
+
+# Run migrations
+python manage.py migrate
+
+# Collect static files
+python manage.py collectstatic
+
+# Initialize vectorstore (first time only)
+python manage.py init_vectorstore
+
+# Start development server
+python manage.py runserver
 ```
-
-For detailed deployment instructions, see [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md).
-
-## Configuration
 
 ### Environment Variables
 
-Create a `.env` file with the following variables:
+Create a `.env` file with:
 
-```env
+```bash
 # Django Configuration
 SECRET_KEY=your-secret-key-here
-DEBUG=False
-ALLOWED_HOSTS=sermon-rag.fly.dev,*.fly.dev,*.fly.io
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Google API Configuration
 GOOGLE_API_KEY=your-google-api-key-here
-
-# Optional: Sentry for error tracking
-# SENTRY_DSN=your-sentry-dsn-here
 ```
 
-### Google API Key
+## 🎯 Features
 
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Add it to your `.env` file or Fly.io secrets
+- **AI-Powered Q&A**: Ask questions about sermon content using Google Gemini
+- **Semantic Search**: Find relevant sermon passages using FAISS vector search
+- **YouTube Integration**: Direct links to sermon timestamps
+- **Production Ready**: Optimized for deployment on Fly.io
+- **Health Monitoring**: Built-in health checks and status endpoints
+- **Auto-scaling**: Configured for optimal performance
 
-## API Endpoints
+## 📊 API Endpoints
 
-- `GET /` - Main web interface
-- `GET /query/` - Query form page
-- `POST /api/query/` - JSON API for queries
-- `GET /health/` - Health check endpoint
+### Query Sermons
+```http
+POST /api/query/
+Content-Type: application/json
 
-### API Usage Example
+{
+    "question": "What does the Bible teach about love?"
+}
+```
 
+### Health Check
+```http
+GET /health/
+```
+
+### System Status
+```http
+GET /status/
+```
+
+## 🔧 Production Configuration
+
+### Fly.io Configuration
+
+The application is configured for production deployment on Fly.io with:
+
+- **Auto-scaling**: 1-2 instances based on demand
+- **Persistent Storage**: 10GB volume for data persistence
+- **Health Checks**: Automatic monitoring and restart
+- **SSL/TLS**: Automatic HTTPS with HSTS
+- **Security Headers**: Production-grade security configuration
+
+### Performance Optimizations
+
+- **MMR Retrieval**: Diverse document retrieval for better results
+- **Caching**: In-memory caching for improved response times
+- **Connection Pooling**: Optimized database connections
+- **Static File Optimization**: Compressed and cached static assets
+
+## 📈 Monitoring
+
+### Health Checks
+- Application health: `/health/`
+- System status: `/status/`
+- Vectorstore status: `python manage.py check_vectorstore`
+
+### Logs
 ```bash
-curl -X POST http://localhost:8000/api/query/ \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What does the Bible teach about contentment?"}'
+# View application logs
+fly logs
+
+# SSH into running container
+fly ssh console
 ```
 
-### Enhanced Query Function
-
-The system now includes an enhanced query function with YouTube video links and timestamps:
-
-```python
-from rag.services import query_sermons
-
-# Query with YouTube links and timestamps
-answer = query_sermons("What does the Bible teach about contentment?", show_sources=True)
-```
-
-This will output:
-- The answer to your question
-- Source sermons with clickable YouTube links
-- Automatic timestamp extraction and linking
-
-## Project Structure
-
-```
-CFC-RAG/
-├── sermon_rag/          # Django project settings
-├── rag/                 # Main RAG application
-│   ├── services.py      # RAG service logic
-│   ├── views.py         # Web views
-│   ├── templates/       # HTML templates
-│   └── management/      # Django management commands
-├── dataset/             # Sermon dataset
-├── vectorstore/         # FAISS vector database
-├── scripts/             # Deployment and utility scripts
-│   ├── deploy.sh        # Fly.io deployment script
-│   └── health_check.py  # Health check script
-├── requirements.txt     # Python dependencies
-├── Dockerfile          # Docker configuration
-├── docker-compose.yml  # Docker Compose setup
-├── fly.toml           # Fly.io configuration
-├── start.sh            # Local development startup script
-└── env.example         # Environment variables template
-```
-
-## Technical Details
-
-### RAG Pipeline
-
-1. **Document Processing**: Sermons are split into chunks using RecursiveCharacterTextSplitter
-2. **Embeddings**: Google Gemini embeddings (models/embedding-001)
-3. **Vector Storage**: FAISS for efficient similarity search
-4. **Retrieval**: Top-5 most relevant chunks for each query
-5. **Generation**: Google Gemini Flash for answer generation
-
-### Performance
-
-- **Dataset**: 417 sermons, ~3.8M words
-- **Chunks**: 63,420 document chunks (500 chars each, 200 overlap)
-- **Retrieval**: Sub-second search times
-- **Generation**: 2-5 seconds for answer generation
-
-## Production Features
-
-### Security
-- **HTTPS**: Automatic SSL certificates with Fly.io
-- **Security Headers**: HSTS, XSS protection, content type sniffing prevention
-- **CORS**: Proper cross-origin configuration
-- **Environment Variables**: Secure secret management
-
-### Monitoring
-- **Health Checks**: Built-in health monitoring
-- **Logging**: Comprehensive logging to files and console
-- **Metrics**: Available through Fly.io dashboard
-- **Auto-scaling**: Scales to zero when not in use
-
-### Performance
-- **Static Files**: WhiteNoise for efficient static file serving
-- **Caching**: Optimized for production workloads
-- **Resource Management**: Configurable CPU and memory allocation
-
-## Deployment
-
-### Cloud Deployment Options
-
-The application is fully dockerized and can be deployed to any cloud platform:
-
-- **Fly.io**: Production-ready with auto-scaling (recommended)
-- **AWS**: ECS, EKS, or Elastic Beanstalk
-- **Google Cloud**: Cloud Run, GKE, or App Engine
-- **Azure**: Container Instances or AKS
-- **DigitalOcean**: App Platform or Droplets
-
-### Production Considerations
-
-1. **Environment Variables**: Set `DEBUG=False` and proper `ALLOWED_HOSTS`
-2. **Static Files**: Configure proper static file serving
-3. **Database**: Consider PostgreSQL for production
-4. **Caching**: Add Redis for caching vectorstore queries
-5. **Monitoring**: Add logging and monitoring
-
-## Development
-
-### Adding New Features
-
-1. **New Endpoints**: Add to `rag/views.py` and `rag/urls.py`
-2. **UI Changes**: Modify templates in `rag/templates/`
-3. **RAG Logic**: Update `rag/services.py`
-
-### Management Commands
-
+### Scaling
 ```bash
-# Initialize vectorstore
+# Scale horizontally
+fly scale count 2
+
+# Scale vertically
+fly scale memory 8192
+fly scale cpu 4
+```
+
+## 🛠️ Management Commands
+
+### Initialize Vectorstore
+```bash
 python manage.py init_vectorstore
+```
 
-# Force recreate vectorstore
+### Check Vectorstore Status
+```bash
+python manage.py check_vectorstore
+```
+
+### Force Recreate Vectorstore
+```bash
 python manage.py init_vectorstore --force
 ```
 
-## Troubleshooting
+## 🔒 Security
+
+- **HTTPS Only**: All production traffic is encrypted
+- **Security Headers**: HSTS, CSP, XSS protection
+- **CORS Configuration**: Restricted to production domains
+- **Environment Variables**: Sensitive data stored as secrets
+- **Non-root Container**: Application runs as non-privileged user
+
+## 📁 Project Structure
+
+```
+CFC-RAG/
+├── rag/                    # RAG application
+│   ├── services.py        # RAG service implementation
+│   ├── views.py           # API endpoints
+│   └── management/        # Django management commands
+├── sermon_rag/            # Django project settings
+├── dataset/               # Sermon dataset
+├── vectorstore/           # FAISS vectorstore
+├── Dockerfile            # Production container
+├── fly.toml              # Fly.io configuration
+├── deploy.sh             # Deployment script
+└── requirements.txt      # Python dependencies
+```
+
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Google API Key Error**
-   - Ensure your API key is valid and has Gemini API access
-   - Check the `.env` file is properly loaded
+1. **Vectorstore not found**
+   ```bash
+   python manage.py init_vectorstore
+   ```
 
-2. **Vectorstore Not Found**
-   - Run `python manage.py init_vectorstore`
-   - Ensure the dataset file exists at `dataset/sermons_zac.csv`
+2. **Google API Key issues**
+   - Verify API key is set in environment
+   - Check API key permissions
 
-3. **Memory Issues**
-   - The vectorstore creation requires significant memory
-   - Consider using a machine with at least 8GB RAM
+3. **Memory issues**
+   ```bash
+   fly scale memory 8192
+   ```
 
-4. **Docker Issues**
-   - Ensure Docker and Docker Compose are installed
-   - Check that ports 8000 is available
+4. **Deployment failures**
+   ```bash
+   fly logs
+   fly status
+   ```
 
-5. **Fly.io Deployment Issues**
-   - Check logs: `fly logs`
-   - Verify secrets: `fly secrets list`
-   - Check status: `fly status`
+### Debug Mode
 
-## License
+For debugging, temporarily enable debug mode:
+```bash
+fly secrets set DEBUG="True"
+fly deploy
+```
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📞 Support
+
+For issues and questions:
+- Check the [troubleshooting section](#-troubleshooting)
+- Review the [production deployment guide](PRODUCTION_DEPLOYMENT.md)
+- Open an issue on GitHub

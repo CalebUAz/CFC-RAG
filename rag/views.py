@@ -55,19 +55,30 @@ def query_sermons(request):
 
 
 def health_check(request):
-    """Health check endpoint."""
+    """Simple health check endpoint for load balancer."""
+    # Simple health check that doesn't depend on RAG service
+    return JsonResponse({
+        'status': 'healthy',
+        'message': 'Application is running'
+    })
+
+
+def health_check_detailed(request):
+    """Detailed health check endpoint that checks RAG service."""
     try:
         rag_service = get_rag_service()
         is_ready = rag_service.is_ready()
 
         return JsonResponse({
             'status': 'healthy' if is_ready else 'initializing',
-            'rag_ready': is_ready
+            'rag_ready': is_ready,
+            'message': 'RAG system is ready' if is_ready else 'RAG system is initializing'
         })
     except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'error': str(e)
+            'error': str(e),
+            'message': 'RAG system error'
         }, status=500)
 
 

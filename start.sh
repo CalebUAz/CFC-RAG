@@ -1,63 +1,69 @@
 #!/bin/bash
 
-# Startup script for the Django RAG application
+# Production startup script for CFC RAG Service
+# This script starts the Django application with Gunicorn
 
-echo "Starting Django RAG Application..."
+set -e
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env.example .env
-    echo "Please edit .env file with your Google API key and other settings."
-    echo "You can get a Google API key from: https://makersuite.google.com/app/apikey"
-    exit 1
-fi
+echo "🚀 Starting CFC RAG Service..."
 
-# Check if virtual environment exists
-if [ ! -d "CFC_venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv CFC_venv
-fi
+# Set environment variables
+export DJANGO_SETTINGS_MODULE=sermon_rag.settings
+export PYTHONPATH=/app
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source CFC_venv/bin/activate
+# Create logs directory if it doesn't exist
+mkdir -p /app/logs
 
-# Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip
+# Function to check if the application is ready
+check_ready() {
+    echo "🔍 Checking if application is ready..."
+    
+    # Wait for database migrations
+    echo "📊 Running database migrations..."
+    python manage.py migrate --noinput
+    
+    # Check if vectorstore exists, if not initialize it
+    if [ ! -f "/app/vectorstore/index.faiss" ]; then
+        echo "📚 Vectorstore not found. Initializing..."
+        python manage.py init_vectorstore
+    else
+        echo "✅ Vectorstore found"
+    fi
+    
+    # Test basic Django functionality
+    echo "🧪 Testing Django application..."
+    python manage.py check --deploy
+    
+    echo "✅ Application is ready!"
+}
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
+# Function to start Gunicorn
+start_gunicorn() {
+    echo "🔄 Starting Gunicorn server..."
+    
+    # More conservative settings for production
+    exec gunicorn \
+        --bind 0.0.0.0:8000 \
+        --workers 1 \
+        --worker-class sync \
+        --worker-connections 100 \
+        --max-requests 50 \
+        --max-requests-jitter 10 \
+        --timeout 120 \
+        --keep-alive 5 \
+        --preload \
+        --access-logfile /app/logs/access.log \
+        --error-logfile /app/logs/error.log \
+        --log-level info \
+        --capture-output \
+        sermon_rag.wsgi:application
+}
 
-# Install compatible numpy version
-echo "Installing compatible numpy version..."
-pip install "numpy<2"
+# Main execution
+echo "🔧 Setting up application..."
 
-# Run migrations
-echo "Running migrations..."
-python manage.py migrate
+# Check if application is ready
+check_ready
 
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
-
-# Check if vectorstore exists, if not create it
-if [ ! -d "vectorstore/sermons_vectorstore" ]; then
-    echo "Vectorstore not found. Initializing..."
-    echo "This may take several minutes..."
-    echo "Make sure you have set your GOOGLE_API_KEY in the .env file!"
-    python manage.py init_vectorstore
-else
-    echo "Vectorstore found. Skipping initialization."
-fi
-
-# Start the development server
-echo "Starting Django development server..."
-echo "Access the application at: http://localhost:8000"
-python manage.py runserver 0.0.0.0:8000
-
-# Start the development server
-echo "Starting Django development server..."
-python manage.py runserver 0.0.0.0:8000
+# Start the server
+start_gunicorn

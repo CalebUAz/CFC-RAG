@@ -94,9 +94,23 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "data" / "db.sqlite3",
+        "OPTIONS": {
+            "timeout": 20,
+        },
     }
 }
 
+# Cache configuration
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+        "TIMEOUT": 300,  # 5 minutes
+        "OPTIONS": {
+            "MAX_ENTRIES": 1000,
+        },
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -138,6 +152,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # WhiteNoise configuration for production
 if not DEBUG:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    # Add cache headers for static files
+    WHITENOISE_ADD_HEADERS_FUNCTION = lambda headers, path, url: headers.update({
+        'Cache-Control': 'public, max-age=31536000, immutable',
+    })
 else:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
@@ -152,6 +170,9 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    
+    # Additional security headers
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
 # CORS settings
 if DEBUG:
@@ -163,6 +184,8 @@ else:
         "https://*.fly.io",
     ]
     CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOWED_METHODS = ["GET", "POST", "OPTIONS"]
+    CORS_ALLOWED_HEADERS = ["*"]
 
 # Google API Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -170,6 +193,20 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 # RAG Configuration
 VECTORSTORE_PATH = BASE_DIR / "vectorstore" / "sermons_vectorstore"
 DATASET_PATH = BASE_DIR / "dataset" / "RLCF-Pitts.csv"
+
+# Sentry configuration for error tracking
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN and not DEBUG:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+        environment="production" if not DEBUG else "development",
+    )
 
 # Logging configuration
 LOGGING = {
@@ -188,9 +225,11 @@ LOGGING = {
     "handlers": {
         "file": {
             "level": "INFO",
-            "class": "logging.FileHandler",
+            "class": "logging.handlers.RotatingFileHandler",
             "filename": BASE_DIR / "logs" / "django.log",
             "formatter": "verbose",
+            "maxBytes": 1024 * 1024 * 10,  # 10MB
+            "backupCount": 5,
         },
         "console": {
             "level": "INFO",
@@ -208,8 +247,28 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "rag": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
+# Performance optimizations
+if not DEBUG:
+    # Database connection pooling
+    DATABASES["default"]["CONN_MAX_AGE"] = 600
+    
+    # Session configuration
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    
+    # CSRF configuration
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = "Lax"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
