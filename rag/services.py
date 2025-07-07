@@ -55,8 +55,12 @@ class SermonRAGService:
             # Create retriever
             if self.vectorstore:
                 self.retriever = self.vectorstore.as_retriever(
-                    search_type="similarity",
-                    search_kwargs={"k": 5}
+                    search_type="mmr",
+                    search_kwargs={
+                        "k": 10,
+                        "fetch_k": 20,
+                        "lambda_mult": 0.7
+                    }
                 )
                 
                 # Create RAG chain
@@ -209,8 +213,8 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         Returns:
             str: Timestamp in seconds for YouTube URL
         """
-        # Look for various timestamp patterns in the first 100 characters
-        search_text = content[:100].lower()
+        # Look for various timestamp patterns in the entire content
+        search_text = content.lower()
 
         # Pattern 1: Simple seconds like "10s", "45s"
         seconds_match = re.search(r'(\d+)s(?!\w)', search_text)
@@ -358,6 +362,7 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         try:
             # Get relevant documents
             relevant_docs = self.retriever.get_relevant_documents(question)
+            print(f"🔍 Retrieved {len(relevant_docs)} documents from vectorstore")
             
             # Generate answer
             raw_answer = self.rag_chain.invoke(question)
@@ -368,21 +373,27 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
             # Format sources with YouTube links and deduplicate
             sources = []
             seen_sources = set()  # Track unique source combinations
+            print(f"🔍 Processing {len(relevant_docs)} documents for sources...")
             
             for doc in relevant_docs:
                 video_id = doc.metadata.get('video_id', '')
                 title = doc.metadata.get('title', 'Unknown Title')
+                timestamp = self._extract_timestamp(doc.page_content)
                 
-                # Create unique identifier for deduplication
-                source_key = f"{video_id}_{title}"
+                # Create unique identifier for deduplication including timestamp
+                # This allows multiple sources from same sermon if they have different timestamps
+                source_key = f"{video_id}_{title}_{timestamp}"
                 
-                # Skip if we've already seen this source
+                print(f"  📄 Document: {title} | Video: {video_id} | Timestamp: {timestamp} | Key: {source_key}")
+                
+                # Skip if we've already seen this exact source with same timestamp
                 if source_key in seen_sources:
+                    print(f"    ⏭️ Skipping duplicate source")
                     continue
                 
                 seen_sources.add(source_key)
+                print(f"    ✅ Adding new source")
                 
-                timestamp = self._extract_timestamp(doc.page_content)
                 youtube_link = self._create_youtube_link(video_id, timestamp)
 
                 source_info = {
@@ -503,18 +514,19 @@ def query_sermons(question: str, show_sources: bool = True):
                 title = doc.metadata.get('title', 'Unknown Title')
                 video_id = doc.metadata.get('video_id', '')
                 
-                # Create unique identifier for deduplication
-                source_key = f"{video_id}_{title}"
+                # Extract timestamp using the service method
+                timestamp = rag_service._extract_timestamp(doc.page_content)
                 
-                # Skip if we've already seen this source
+                # Create unique identifier for deduplication including timestamp
+                # This allows multiple sources from same sermon if they have different timestamps
+                source_key = f"{video_id}_{title}_{timestamp}"
+                
+                # Skip if we've already seen this exact source with same timestamp
                 if source_key in seen_sources:
                     continue
                 
                 seen_sources.add(source_key)
                 source_count += 1
-
-                # Extract timestamp using the service method
-                timestamp = rag_service._extract_timestamp(doc.page_content)
 
                 # Create YouTube link with timestamp
                 youtube_link = rag_service._create_youtube_link(video_id, timestamp)

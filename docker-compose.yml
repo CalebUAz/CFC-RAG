@@ -10,7 +10,7 @@ services:
       - ./dataset:/app/dataset
       - ./staticfiles:/app/staticfiles
     environment:
-      - DEBUG=False
+      - DEBUG=True
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     env_file:
       - .env
