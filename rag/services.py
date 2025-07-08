@@ -11,6 +11,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import time
+import hashlib
+from collections import OrderedDict
 
 from django.conf import settings
 from langchain_core.documents import Document
@@ -20,6 +23,49 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+
+
+class MemoryEfficientCache:
+    """Memory-efficient LRU cache with automatic cleanup."""
+    
+    def __init__(self, max_size=100, max_age=3600):
+        self.max_size = max_size
+        self.max_age = max_age
+        self.cache = OrderedDict()
+    
+    def get(self, key: str) -> Optional[Dict]:
+        """Get item from cache if not expired."""
+        if key in self.cache:
+            item = self.cache[key]
+            if time.time() - item['timestamp'] < self.max_age:
+                # Move to end (most recently used)
+                self.cache.move_to_end(key)
+                return item['data']
+            else:
+                # Remove expired item
+                del self.cache[key]
+        return None
+    
+    def set(self, key: str, data: Dict):
+        """Set item in cache with automatic cleanup."""
+        # Remove oldest items if cache is full
+        while len(self.cache) >= self.max_size:
+            self.cache.popitem(last=False)
+        
+        self.cache[key] = {
+            'data': data,
+            'timestamp': time.time()
+        }
+    
+    def cleanup(self):
+        """Remove expired items."""
+        current_time = time.time()
+        expired_keys = [
+            key for key, item in self.cache.items()
+            if current_time - item['timestamp'] > self.max_age
+        ]
+        for key in expired_keys:
+            del self.cache[key]
 
 
 class SermonRAGService:
@@ -32,6 +78,9 @@ class SermonRAGService:
         self.retriever = None
         self.rag_chain = None
         self._initialized = False
+        self._lazy_loaded = False  # Track if vectorstore is lazily loaded
+        self._last_used = None  # Track last usage for cleanup
+        self._query_cache = MemoryEfficientCache(max_size=50, max_age=1800)  # 30 min cache
     
     def _initialize_components(self):
         """Initialize all RAG components."""
@@ -54,23 +103,7 @@ class SermonRAGService:
                 google_api_key=settings.GOOGLE_API_KEY
             )
             
-            # Load or create vectorstore
-            self._load_or_create_vectorstore()
-            
-            # Create retriever
-            if self.vectorstore:
-                self.retriever = self.vectorstore.as_retriever(
-                    search_type="mmr",  # Use MMR (Maximal Marginal Relevance) for diversity
-                    search_kwargs={
-                        "k": 10,  # Get more documents initially
-                        "fetch_k": 20,  # Fetch more candidates
-                        "lambda_mult": 0.7  # Balance between relevance and diversity
-                    }
-                )
-                
-                # Create RAG chain
-                self._create_rag_chain()
-                
+            # Don't load vectorstore immediately - use lazy loading
             self._initialized = True
             print("✅ RAG components initialized successfully!")
                 
@@ -147,17 +180,23 @@ class SermonRAGService:
             split_docs = text_splitter.split_documents(documents)
             print(f"🔪 Split into {len(split_docs)} chunks")
             
-            # Create vectorstore
+            # Create vectorstore with smaller initial batch
             print("⏳ Creating vector store... (this may take a few minutes)")
             self.vectorstore = FAISS.from_documents(
-                documents=split_docs[0:500],
+                documents=split_docs[0:100],  # Reduced from 500 to save memory
                 embedding=self.embeddings
             )
             
-            # Add remaining documents in batches
-            for i in range(500, len(split_docs), 100):
-                self.vectorstore.add_documents(split_docs[i:i+500])
-                if i % 1000 == 0:
+            # Add remaining documents in smaller batches
+            batch_size = 50  # Reduced from 100 to save memory
+            for i in range(100, len(split_docs), batch_size):
+                end_idx = min(i + batch_size, len(split_docs))
+                self.vectorstore.add_documents(split_docs[i:end_idx])
+                
+                # Force garbage collection every few batches
+                if i % (batch_size * 10) == 0:
+                    import gc
+                    gc.collect()
                     print(f"Processed {i}/{len(split_docs)} documents")
             
             # Save vectorstore
@@ -368,10 +407,23 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
         if not self._initialized:
             self._initialize_components()
         
+        # Ensure vectorstore is loaded if not already
+        self._ensure_vectorstore_loaded()
+
         if not self.rag_chain:
             raise RuntimeError("RAG system not properly initialized")
         
+        # Check cache first
+        cache_key = hashlib.md5(question.encode()).hexdigest()
+        cached_result = self._query_cache.get(cache_key)
+        if cached_result:
+            print("💾 Returning cached result")
+            return cached_result
+        
         try:
+            # Update last used timestamp
+            self._last_used = time.time()
+            
             # Get relevant documents
             relevant_docs = self.retriever.get_relevant_documents(question)
             print(f"🔍 Retrieved {len(relevant_docs)} documents from vectorstore")
@@ -419,12 +471,17 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
                 }
                 sources.append(source_info)
             
-            return {
+            result = {
                 'question': question,
                 'answer': answer,
                 'sources': sources,
                 'num_sources': len(sources)
             }
+            
+            # Cache the result
+            self._query_cache.set(cache_key, result)
+            
+            return result
             
         except Exception as e:
             print(f"Error processing query: {e}")
@@ -444,6 +501,7 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
                 print(f"Error during initialization: {e}")
                 return False
         
+        # Check if vectorstore is loaded and initialized
         return all([
             self.embeddings is not None,
             self.vectorstore is not None,
@@ -471,6 +529,18 @@ or spiritual insights when mentioned in the context. Be helpful and encouraging 
                 status['document_count'] = 'unknown'
 
         return status
+
+    def cleanup_memory(self, max_idle_time=300):
+        """Clean up memory by unloading vectorstore if idle."""
+        if (self._lazy_loaded and self._last_used and 
+            time.time() - self._last_used > max_idle_time):
+            print("🧹 Cleaning up memory - unloading vectorstore...")
+            self.vectorstore = None
+            self.retriever = None
+            self.rag_chain = None
+            self._lazy_loaded = False
+            import gc
+            gc.collect()  # Force garbage collection
 
 
 # Global instance - Initialize lazily

@@ -1,98 +1,111 @@
 """
-Middleware to ensure RAG system is ready before processing requests.
+Middleware for the RAG application.
 """
 
+import time
+import psutil
+import gc
 from django.http import JsonResponse
-from django.shortcuts import render
-from django.urls import resolve
-from rag.services import get_rag_service
-import logging
-
-logger = logging.getLogger(__name__)
+from django.conf import settings
+from .services import get_rag_service
 
 
-class RAGReadinessMiddleware:
-    """
-    Middleware to check if RAG system is ready before processing RAG-related requests.
-    """
+class RAGMiddleware:
+    """Middleware to ensure RAG system is ready before processing requests."""
     
     def __init__(self, get_response):
         self.get_response = get_response
-        self.rag_service = None
-        
+        self.last_cleanup = time.time()
+        self.cleanup_interval = 300  # 5 minutes
+    
     def __call__(self, request):
+        # Check if we need to perform memory cleanup
+        current_time = time.time()
+        if current_time - self.last_cleanup > self.cleanup_interval:
+            self._perform_memory_cleanup()
+            self.last_cleanup = current_time
+        
         # Check if this is a RAG-related request
-        if self._is_rag_request(request):
-            # Ensure RAG service is ready
-            if not self._ensure_rag_ready():
-                return self._handle_not_ready(request)
+        if request.path.startswith('/api/query') or request.path.startswith('/rag/'):
+            try:
+                rag_service = get_rag_service()
+                
+                # Check memory usage
+                memory_usage = self._get_memory_usage()
+                if memory_usage > 80:  # If memory usage > 80%
+                    print(f"⚠️ High memory usage detected: {memory_usage:.1f}%")
+                    rag_service.cleanup_memory(max_idle_time=60)  # More aggressive cleanup
+                
+                # Check if RAG system is ready
+                if not rag_service.is_ready():
+                    return JsonResponse({
+                        'error': 'RAG system is initializing. Please try again in a moment.',
+                        'status': 'initializing'
+                    }, status=503)
+                    
+            except Exception as e:
+                return JsonResponse({
+                    'error': f'RAG system error: {str(e)}',
+                    'status': 'error'
+                }, status=500)
         
         response = self.get_response(request)
         return response
     
-    def _is_rag_request(self, request):
-        """Check if the request is RAG-related."""
+    def _get_memory_usage(self):
+        """Get current memory usage percentage."""
         try:
-            resolver_match = resolve(request.path_info)
-            # Check if the request is for RAG app
-            return resolver_match.app_name == 'rag'
+            process = psutil.Process()
+            memory_percent = process.memory_percent()
+            return memory_percent
         except:
-            return False
+            return 0
     
-    def _ensure_rag_ready(self):
-        """Ensure RAG service is ready."""
+    def _perform_memory_cleanup(self):
+        """Perform periodic memory cleanup."""
         try:
-            if self.rag_service is None:
-                self.rag_service = get_rag_service()
+            # Force garbage collection
+            gc.collect()
             
-            return self.rag_service.is_ready()
+            # Clean up RAG service cache
+            rag_service = get_rag_service()
+            rag_service._query_cache.cleanup()
+            
+            # Log memory usage
+            memory_usage = self._get_memory_usage()
+            print(f"🧹 Memory cleanup completed. Current usage: {memory_usage:.1f}%")
+            
         except Exception as e:
-            logger.error(f"Error checking RAG readiness: {e}")
-            return False
-    
-    def _handle_not_ready(self, request):
-        """Handle requests when RAG system is not ready."""
-        error_message = "RAG system is initializing. Please try again in a moment."
-        
-        # Check if it's an API request
-        if request.path.startswith('/api/') or request.content_type == 'application/json':
-            return JsonResponse({
-                'error': error_message,
-                'status': 'initializing'
-            }, status=503)
-        
-        # For web requests, render an error page
-        return render(request, 'rag/not_ready.html', {
-            'error': error_message
-        }, status=503)
+            print(f"Error during memory cleanup: {e}")
 
 
-class RAGWarmupMiddleware:
-    """
-    Middleware to warm up RAG service on application startup.
-    """
+class MemoryMonitoringMiddleware:
+    """Middleware to monitor and log memory usage."""
     
     def __init__(self, get_response):
         self.get_response = get_response
-        self.warmed_up = False
-        
+    
     def __call__(self, request):
-        # Warm up on first request
-        if not self.warmed_up:
-            self._warmup()
-            self.warmed_up = True
-            
+        # Log memory usage before request
+        start_memory = self._get_memory_usage()
+        
         response = self.get_response(request)
+        
+        # Log memory usage after request
+        end_memory = self._get_memory_usage()
+        memory_diff = end_memory - start_memory
+        
+        # Log significant memory changes
+        if abs(memory_diff) > 5:  # More than 5% change
+            print(f"📊 Memory change: {start_memory:.1f}% → {end_memory:.1f}% (Δ{memory_diff:+.1f}%)")
+        
         return response
     
-    def _warmup(self):
-        """Warm up the RAG service."""
+    def _get_memory_usage(self):
+        """Get current memory usage percentage."""
         try:
-            logger.info("Warming up RAG service...")
-            rag_service = get_rag_service()
-            if rag_service.is_ready():
-                logger.info("RAG service warmed up successfully")
-            else:
-                logger.warning("RAG service warmup completed but system not ready")
-        except Exception as e:
-            logger.error(f"Error during RAG warmup: {e}")
+            process = psutil.Process()
+            memory_percent = process.memory_percent()
+            return memory_percent
+        except:
+            return 0

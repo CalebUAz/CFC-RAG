@@ -41,21 +41,22 @@ check_ready() {
 start_gunicorn() {
     echo "🔄 Starting Gunicorn server..."
     
-    # More conservative settings for production
+    # Memory-optimized settings for production
     exec gunicorn \
         --bind 0.0.0.0:8000 \
         --workers 1 \
         --worker-class sync \
-        --worker-connections 100 \
-        --max-requests 50 \
-        --max-requests-jitter 10 \
+        --worker-connections 50 \
+        --max-requests 25 \
+        --max-requests-jitter 5 \
         --timeout 120 \
-        --keep-alive 5 \
+        --keep-alive 2 \
         --preload \
         --access-logfile /app/logs/access.log \
         --error-logfile /app/logs/error.log \
         --log-level info \
         --capture-output \
+        --max-requests-jitter 5 \
         sermon_rag.wsgi:application
 }
 

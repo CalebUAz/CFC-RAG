@@ -58,6 +58,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "rag.middleware.MemoryMonitoringMiddleware",  # Monitor memory usage
+    "rag.middleware.RAGMiddleware",  # RAG readiness and memory cleanup
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -100,14 +102,14 @@ DATABASES = {
     }
 }
 
-# Cache configuration
+# Cache configuration - optimized for memory
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "unique-snowflake",
-        "TIMEOUT": 300,  # 5 minutes
+        "TIMEOUT": 1800,  # 30 minutes
         "OPTIONS": {
-            "MAX_ENTRIES": 1000,
+            "MAX_ENTRIES": 100,  # Reduced from 1000 to save memory
         },
     }
 }
