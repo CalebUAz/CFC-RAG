@@ -2,6 +2,9 @@
 
 A Retrieval-Augmented Generation (RAG) system that answers questions about sermons using AI. Built with Django, LangChain, FAISS, and Google Gemini.
 
+Deployed app can be found at [http://sermon-rag.fly.dev](http://sermon-rag.fly.dev)
+
+
 ## 🚀 Quick Deploy to Production
 
 ### Prerequisites
